@@ -928,22 +928,43 @@ class Trainer():
 
         ratios = torch.linspace(0., 8., 100)
 
+        #### i added this:
+        def my_func(x):
+            if 0.00001 < x < 0.25:
+                return 1.
+            elif x > 0.25:
+                return 0.
+            else:
+                return x
+        vect_func = np.vectorize(my_func)
+        ####
+
         frames = []
+        frames_masks = []
         for ratio in tqdm(ratios):
             interp_latents = slerp(ratio, latents_low, latents_high)
             latents = [(interp_latents, num_layers)]
             generated_images = self.generate_truncated(self.GAN.SE, self.GAN.GE, latents, n, trunc_psi = self.trunc_psi)
-            images_grid = torchvision.utils.make_grid(generated_images, nrow = num_rows)
+            # images_grid = torchvision.utils.make_grid(generated_images, nrow = num_rows)
+            images_grid = torchvision.utils.make_grid(generated_images[:, :3, :, :], nrow = num_rows)  # i replaced the previous line with this one
             pil_image = transforms.ToPILImage()(images_grid.cpu())
             frames.append(pil_image)
 
+            generated_masks = torch.from_numpy(vect_func(generated_images[:, 3:, :, :].cpu())).float()  # i added those 4 lines
+            masks_grid = torchvision.utils.make_grid(generated_masks, nrow = num_rows)                  #
+            pil_mask = transforms.ToPILImage()(masks_grid.cpu())                                        #
+            frames_masks.append(pil_mask)                                                               #
+
         frames[0].save(str(self.results_dir / self.name / f'{str(num)}.gif'), save_all=True, append_images=frames[1:], duration=80, loop=0, optimize=True)
+        frames_masks[0].save(str(self.results_dir / self.name / f'{str(num)}-mask.gif'), save_all=True, append_images=frames_masks[1:], duration=80, loop=0, optimize=True)   # i added this line
 
         if save_frames:
             folder_path = (self.results_dir / self.name / f'{str(num)}')
             folder_path.mkdir(parents=True, exist_ok=True)
             for ind, frame in enumerate(frames):
                 frame.save(str(folder_path / f'{str(ind)}.{ext}'))
+            for ind, mask in enumerate(frames_masks):                        # i added those 2 lines
+                mask.save(str(folder_path / f'{str(ind)}-mask.{ext}'))       #
 
     def print_log(self):
         pl_mean = default(self.pl_mean, 0)
