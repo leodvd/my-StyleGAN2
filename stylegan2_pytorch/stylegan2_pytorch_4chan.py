@@ -857,8 +857,8 @@ class Trainer():
 
         generated_images = self.generate_truncated(self.GAN.S, self.GAN.G, latents, n, trunc_psi = self.trunc_psi)
         # torchvision.utils.save_image(generated_images, str(self.results_dir / self.name / f'{str(num)}.{ext}'), nrow=num_rows)
-        torchvision.utils.save_image(generated_images[:, :3, :, :], str(self.results_dir / self.name / f'{str(num)}.{ext}'), nrow=num_rows)
-        torchvision.utils.save_image(generated_images[:, 3:, :, :], str(self.results_dir / self.name / f'{str(num)}-mask.{ext}'), nrow=num_rows)
+        torchvision.utils.save_image(generated_images[:, :3, :, :], str(self.results_dir / self.name / f'{str(num)}-basic.{ext}'), nrow=num_rows)
+        torchvision.utils.save_image(generated_images[:, 3:, :, :], str(self.results_dir / self.name / f'{str(num)}-basic-mask.{ext}'), nrow=num_rows)
 
         # moving averages
 
