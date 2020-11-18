@@ -155,18 +155,33 @@ def calc_pl_lengths(styles, images):
 def noise(n, latent_dim):
     return torch.randn(n, latent_dim).cuda()
 
+# to try latent vectors others than randn:
+def noise2(n, latent_dim):
+    return torch.zeros(n, latent_dim).cuda()
+
 def noise_list(n, layers, latent_dim):
     return [(noise(n, latent_dim), layers)]
+
+def noise_list2(n, layers, latent_dim):
+    return [(noise2(n, latent_dim), layers)]
 
 def mixed_list(n, layers, latent_dim):
     tt = int(torch.rand(()).numpy() * layers)
     return noise_list(n, tt, latent_dim) + noise_list(n, layers - tt, latent_dim)
+
+def mixed_list2(n, layers, latent_dim):
+    tt = int(torch.rand(()).numpy() * layers)
+    return noise_list2(n, tt, latent_dim) + noise_list2(n, layers - tt, latent_dim)
 
 def latent_to_w(style_vectorizer, latent_descr):
     return [(style_vectorizer(z), num_layers) for z, num_layers in latent_descr]
 
 def image_noise(n, im_size):
     return torch.FloatTensor(n, im_size, im_size, 1).uniform_(0., 1.).cuda()
+
+def image_noise2(n, im_size):
+    return torch.FloatTensor(n, im_size, im_size, 1).uniform_(0., 1.).cuda()
+    # return torch.FloatTensor(n, im_size, im_size, 1).uniform_(0., 0.5).cuda()
 
 def leaky_relu(p=0.2):
     return nn.LeakyReLU(p, inplace=True)
@@ -230,7 +245,7 @@ class Dataset(data.Dataset):
             transforms.Lambda(convert_image_fn),
             transforms.Lambda(partial(resize_to_minimum_size, image_size)),
             transforms.Resize(image_size),
-            RandomApply(aug_prob, transforms.RandomResizedCrop(image_size, scale=(0.5, 1.0), ratio=(0.98, 1.02)), transforms.CenterCrop(image_size)),  # todo: try changing the scale here
+            RandomApply(aug_prob, transforms.RandomResizedCrop(image_size, scale=(0.5, 1.0), ratio=(0.98, 1.02)), transforms.CenterCrop(image_size)),
             transforms.ToTensor(),
             transforms.Lambda(expand_greyscale(num_channels))
         ])
@@ -543,8 +558,7 @@ class StyleGAN2(nn.Module):
         self.S = StyleVectorizer(latent_dim, style_depth)
         self.G = Generator(image_size, latent_dim, network_capacity, transparent = transparent, attn_layers = attn_layers, no_const = no_const, fmap_max = fmap_max)
         self.D = Discriminator(image_size, network_capacity, fq_layers = fq_layers, fq_dict_size = fq_dict_size, attn_layers = attn_layers, transparent = transparent, fmap_max = fmap_max)
-        # to make the discriminator smaller:
-        # self.D = Discriminator(image_size, network_capacity//2, fq_layers = fq_layers, fq_dict_size = fq_dict_size, attn_layers = attn_layers, transparent = transparent, fmap_max = fmap_max)  # todo: remettre vrai disc
+        #
 
         self.SE = StyleVectorizer(latent_dim, style_depth)
         self.GE = Generator(image_size, latent_dim, network_capacity, transparent = transparent, attn_layers = attn_layers, no_const = no_const)
@@ -850,22 +864,22 @@ class Trainer():
 
         # latents and noise
 
-        latents = noise_list(num_rows ** 2, num_layers, latent_dim)
-        n = image_noise(num_rows ** 2, image_size)
+        latents = noise_list2(num_rows ** 2, num_layers, latent_dim)  # todo: put back to noise_list
+        n = image_noise2(num_rows ** 2, image_size)
 
         # regular
 
-        generated_images = self.generate_truncated(self.GAN.S, self.GAN.G, latents, n, trunc_psi = self.trunc_psi)
-        # torchvision.utils.save_image(generated_images, str(self.results_dir / self.name / f'{str(num)}.{ext}'), nrow=num_rows)
-        torchvision.utils.save_image(generated_images[:, :3, :, :], str(self.results_dir / self.name / f'{str(num)}-basic.{ext}'), nrow=num_rows)
-        torchvision.utils.save_image(generated_images[:, 3:, :, :], str(self.results_dir / self.name / f'{str(num)}-basic-mask.{ext}'), nrow=num_rows)
+        # generated_images = self.generate_truncated(self.GAN.S, self.GAN.G, latents, n, trunc_psi = self.trunc_psi)
+        # torchvision.utils.save_image(generated_images, str(self.results_dir / self.name / f'{str(num)}.{ext}'), nrow=num_rows)   # if rgb
+        # torchvision.utils.save_image(generated_images[:, :3, :, :], str(self.results_dir / self.name / f'{str(num)}-basic.{ext}'), nrow=num_rows)           # if 4 channels
+        # torchvision.utils.save_image(generated_images[:, 3:, :, :], str(self.results_dir / self.name / f'{str(num)}-basic-mask.{ext}'), nrow=num_rows)      # if 4 channels
 
         # moving averages
 
         generated_images = self.generate_truncated(self.GAN.SE, self.GAN.GE, latents, n, trunc_psi = self.trunc_psi)
-        # torchvision.utils.save_image(generated_images, str(self.results_dir / self.name / f'{str(num)}-ema.{ext}'), nrow=num_rows)
-        torchvision.utils.save_image(generated_images[:, :3, :, :], str(self.results_dir / self.name / f'{str(num)}-ema.{ext}'), nrow=num_rows)
-        torchvision.utils.save_image(generated_images[:, 3:, :, :], str(self.results_dir / self.name / f'{str(num)}-ema-mask.{ext}'), nrow=num_rows)
+        # torchvision.utils.save_image(generated_images, str(self.results_dir / self.name / f'{str(num)}-ema.{ext}'), nrow=num_rows)   # if rgb
+        torchvision.utils.save_image(generated_images[:, :3, :, :], str(self.results_dir / self.name / f'{str(num)}-ema2.{ext}'), nrow=num_rows)            # if 4 channels
+        torchvision.utils.save_image(generated_images[:, 3:, :, :], str(self.results_dir / self.name / f'{str(num)}-ema2-mask.{ext}'), nrow=num_rows)       # if 4 channels
 
         # mixing regularities
 
@@ -885,9 +899,9 @@ class Trainer():
         mixed_latents = [(tmp1, tt), (tmp2, num_layers - tt)]
 
         generated_images = self.generate_truncated(self.GAN.SE, self.GAN.GE, mixed_latents, n, trunc_psi = self.trunc_psi)
-        # torchvision.utils.save_image(generated_images, str(self.results_dir / self.name / f'{str(num)}-mr.{ext}'), nrow=num_rows)
-        torchvision.utils.save_image(generated_images[:, :3, :, :], str(self.results_dir / self.name / f'{str(num)}-mr.{ext}'), nrow=num_rows)
-        torchvision.utils.save_image(generated_images[:, 3:, :, :], str(self.results_dir / self.name / f'{str(num)}-mr-mask.{ext}'), nrow=num_rows)
+        # torchvision.utils.save_image(generated_images, str(self.results_dir / self.name / f'{str(num)}-mr.{ext}'), nrow=num_rows)   # if rgb
+        torchvision.utils.save_image(generated_images[:, :3, :, :], str(self.results_dir / self.name / f'{str(num)}-mr.{ext}'), nrow=num_rows)            # if 4 channels
+        torchvision.utils.save_image(generated_images[:, 3:, :, :], str(self.results_dir / self.name / f'{str(num)}-mr-mask.{ext}'), nrow=num_rows)       # if 4 channels
 
     @torch.no_grad()
     def generate_truncated(self, S, G, style, noi, trunc_psi = 0.75, num_image_tiles = 8):
@@ -909,6 +923,8 @@ class Trainer():
         w_styles = styles_def_to_tensor(w_space)
         generated_images = evaluate_in_chunks(self.batch_size, G, w_styles, noi)
         return generated_images.clamp_(0., 1.)
+
+
 
     @torch.no_grad()
     def generate_interpolation(self, num = 0, num_image_tiles = 8, trunc = 1.0, save_frames = False):
@@ -944,6 +960,7 @@ class Trainer():
         for ratio in tqdm(ratios):
             interp_latents = slerp(ratio, latents_low, latents_high)
             latents = [(interp_latents, num_layers)]
+
             generated_images = self.generate_truncated(self.GAN.SE, self.GAN.GE, latents, n, trunc_psi = self.trunc_psi)
             # images_grid = torchvision.utils.make_grid(generated_images, nrow = num_rows)
             images_grid = torchvision.utils.make_grid(generated_images[:, :3, :, :], nrow = num_rows)  # i replaced the previous line with this one
