@@ -761,17 +761,19 @@ class Trainer():
         for i in range(self.gradient_accumulate_every):
 
             # this part gets the real images, and 'discriminates' them: (je l'ai mis avant pour avoir acces au batch d'images)
-            image_batch = next(self.loader).cuda()    # print(image_batch.size())
+            image_batch = next(self.loader).cuda()
+            # print('batch size: ', image_batch.size())
 
             crack_presence = []     # (i added this block)
             with torch.no_grad():
                 for k in range(batch_size):
-                    if image_batch[0, 3, :, :].min() < 0.48:
+                    if image_batch[k, 3, :, :].min() < 0.48:
                         crack_presence.append(1)  # there is a crack
-                        print("a crack")
+                        # print("a crack")
                     else:
                         crack_presence.append(-1)  # there is no crack
-                        print("no crack")
+                        # print("no crack")
+            # print(crack_presence)
             image_batch.requires_grad_()
             real_output, real_q_loss = self.GAN.D_aug(image_batch, prob = aug_prob)
 
@@ -779,12 +781,13 @@ class Trainer():
             get_latents_fn = mixed_list if random() < self.mixed_prob else noise_list
             style = get_latents_fn(batch_size, num_layers, latent_dim)
 
-            for image_id_in_batch, tuple in enumerate(style):   # (i added this block)
-                # print(tuple, '\n')
-                for latent in tuple[0]:
+            for tuple in style:   # (i added this block)    # there can be 1 or 2 tuples per style (depending if it's only 1 noise or 2 mixed noises)
+                # print('\n', tuple, '\n')
+                for image_id_in_batch, latent in enumerate(tuple[0]):    # changing the last value of the latent of each image
                     latent[latent_dim-1] = crack_presence[image_id_in_batch]
                 # for latent in tuple[0]:
-                #     print(latent, '\n')
+                #     print(latent[latent_dim-1])
+                # print('')
 
             w_space = latent_to_w(self.GAN.S, style)
             w_styles = styles_def_to_tensor(w_space)
@@ -792,7 +795,7 @@ class Trainer():
             # print(style)  # prints the whole tensor
             # print(w_space)  # prints the whole tensor
             # torch.set_printoptions(profile="default")  # reset
-            print(w_styles.size(), '\n')
+            # print('w_styles size: ', w_styles.size(), '\n')
 
             noise = image_noise(batch_size, image_size)
             generated_images = self.GAN.G(w_styles, noise)
@@ -825,17 +828,25 @@ class Trainer():
 
         self.GAN.G_opt.zero_grad()
         for i in range(self.gradient_accumulate_every):
+            get_latents_fn = mixed_list if random() < self.mixed_prob else noise_list    # i added this line
             style = get_latents_fn(batch_size, num_layers, latent_dim)
+
+            crack_presence = []
+            for b in range(batch_size):
+                value = 1 if random() < 0.8 else -1  # 0.8 is the proportion of images with cracks in the dataset
+                crack_presence.append(value)
+
             for tuple in style:   # (i added this block)
-                # print(tuple, '\n')
-                value = 1 if torch.rand(1) < 0.8 else -1   # 0.8 is the proportion of images with cracks in the dataset
-                for latent in tuple[0]:
-                    latent[latent_dim-1] = value
+                # print('\n', tuple, '\n')
+                for image_id_in_batch, latent in enumerate(tuple[0]):
+                    latent[latent_dim-1] = crack_presence[image_id_in_batch]
                 # for latent in tuple[0]:
-                #     print(latent, '\n')
+                #     print(latent[latent_dim-1])
+                # print('')
 
             w_space = latent_to_w(self.GAN.S, style)
             w_styles = styles_def_to_tensor(w_space)
+            # print('w_styles size: ', w_styles.size(), '\n')
 
             noise = image_noise(batch_size, image_size)
             generated_images = self.GAN.G(w_styles, noise)
