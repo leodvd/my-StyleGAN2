@@ -25,7 +25,6 @@ for i, img_name in enumerate(file_names):
     img = Image.open(f'{source_path}/{img_name}')
     img = CenterCrop(1024)(img)
     img = Resize(RES)(img)
-    # print(image.size)
     img.save(f'{out_path}/{img_name}')
     if i % round(size/20) == 0:
         print(f'conversion: {i}/{size} ==> {round(100*i/size, 1)}%')
